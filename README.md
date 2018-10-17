@@ -19,6 +19,11 @@ Policy gradient methods are covered in Ch. 13 of Sutton and Barto RL textbook.
 
 ## Quickstart
 
+(If you have a virtualenv: `source venv/bin/activate`
+```
+pip install gym
+```
+
 ## Install
 
 
