@@ -22,15 +22,31 @@ def sanity_check_with_observations():
             action = env.action_space.sample()
             observation, reward, done, info = env.step(action)
             if done:
-                print("Episode finished after {} timesteps\n".format(t+1))
+                print(("Episode finished after {} timesteps\n".format(t+1)))
                 break
 
 def introspect_env():
-    print(env.action_space)
-    print(env.observation_space)
+    print((env.action_space))
+    print((env.observation_space))
+    """
+        Observation: 
+        Type: Box(4)
+        Num	Observation                 Min         Max
+        0	Cart Position             -4.8            4.8
+        1	Cart Velocity             -Inf            Inf
+        2	Pole Angle                 -24°           24°
+        3	Pole Velocity At Tip      -Inf            Inf
+        
+    Actions:
+        Type: Discrete(2)
+        Num	Action
+        0	Push cart to the left
+        1	Push cart to the right
 
-    print(env.observation_space.high)
-    print(env.observation_space.low)
+    """
+
+    print((env.observation_space.high))
+    print((env.observation_space.low))
     space = gym.spaces.Discrete(8) # Set with 8 elements {0, 1, 2, ..., 7}
     x = space.sample()
     assert space.contains(x),  'Space does not contain x: ' + x
