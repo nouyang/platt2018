@@ -333,7 +333,7 @@ with tf.Session() as sess:
 # In[167]:
 
 
-get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')
 import matplotlib.pyplot as plt
 
 def running_mean(x, N):
