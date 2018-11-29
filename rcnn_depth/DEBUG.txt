@@ -1,0 +1,15 @@
+RuntimeError: Given groups=1, weight of size [16, 1, 5, 5], expected input[5, 4, 400, 300] to have 1 channels, but got 4 channels instead
+
+>>> solved by switching image from RGBA to L; since the MNIST dataset is B&W 
+
+RuntimeError: size mismatch, m1: [5 x 240000], m2: [1568 x 10] at /pytorch/aten/src/TH/generic/THTensorMath.cpp:2070
+
+images
+i 0
+size batched torch.Size([5, 1, 400, 300])
+grasp
+size batched grasp torch.Size([5])
+one batch of grasp labels:  tensor([3, 4, 3, 2, 4])
+
+
+>>> ???
