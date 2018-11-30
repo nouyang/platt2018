@@ -13,3 +13,9 @@ one batch of grasp labels:  tensor([3, 4, 3, 2, 4])
 
 
 >>> ???
+
+
+https://jdhao.github.io/2017/11/15/pytorch-datatype-note/
+As another example, several loss functions like CrossEntropyLoss require that the target should be torch LongTensor. So before doing operations, make sure that your input Tensor types match the function definitions.
+
+It is easy to convert the type of one Tensor to another Tensor. Suppose x and y are Tensor of different types. You can use x.type(y.type()) or x.type_as(y) to convert x to the type of y.
