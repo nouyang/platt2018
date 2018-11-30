@@ -1,9 +1,5 @@
 import math
 
-def makeRectangle(l, w, theta, offset=(0,0)):
-    c, s = math.cos(theta), math.sin(theta)
-    rectCoords = [(l/2.0, w/2.0), (l/2.0, -w/2.0), (-l/2.0, -w/2.0), (-l/2.0, w/2.0)]
-    return [(c*x-s*y+offset[0], s*x+c*y+offset[1]) for (x,y) in rectCoords]
 
 from PIL import Image
 from PIL import ImageDraw
