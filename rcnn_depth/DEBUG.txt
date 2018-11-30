@@ -88,3 +88,34 @@ RuntimeError: invalid argument 2: size '[-1 x 400]' is invalid for input with 55
 
 >>>  changed to x = x.view(-1, 558720) by hardcoding... but why? What is this
 number?
+
+
+
+Traceback (most recent call last):
+  File "imagegen_strippedclean.py", line 142, in <module>
+    loss = criterion(outputs, labels)
+  File "/home/rui/mlenv/lib/python3.6/site-packages/torch/nn/modules/module.py", line 477, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/rui/mlenv/lib/python3.6/site-packages/torch/nn/modules/loss.py", line 421, in forward
+    return F.mse_loss(input, target, reduction=self.reduction)
+  File "/home/rui/mlenv/lib/python3.6/site-packages/torch/nn/functional.py", line 1716, in mse_loss
+    return _pointwise_loss(lambda a, b: (a - b) ** 2, torch._C._nn.mse_loss, input, target, reduction)
+  File "/home/rui/mlenv/lib/python3.6/site-packages/torch/nn/functional.py", line 1674, in _pointwise_loss
+    return lambd_optimized(input, target, reduction)
+RuntimeError: input and target shapes do not match: input [97 x 2], target [5 x 2] at /pytorch/aten/src/THNN/generic/MSECriterion.c:12
+
+
+
+torch.Size([5, 3, 400, 300])
+torch.Size([5, 6, 198, 148])
+torch.Size([5, 16, 97, 72])
+torch.Size([97, 5760])
+torch.Size([97, 120])
+torch.Size([97, 84])
+torch.Size([97, 2])
+
+
+>>> changed from random incorrect constant to correct size (16*96*72) --> the "5" batch size was getting killed by
+the x.view(-1, wrong_constant)
+
+
