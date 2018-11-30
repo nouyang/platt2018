@@ -1,0 +1,74 @@
+
+import numpy as np
+from PIL import Image, ImageDraw
+
+import torch
+import torch.nn as nn
+import torchvision
+import torchvision.transforms as transforms
+
+from torch.utils.data import TensorDataset, DataLoader
+import torch.nn.functional as F
+
+
+# Define data loader
+batch_size = 5
+# Input (temp, rainfall, humidity)
+inputs = np.array([[73, 67, 43],
+                   [91, 88, 64],
+                   [87, 134, 58],
+                   [102, 43, 37],
+                   [69, 96, 70]], dtype='float32')
+
+# Targets (apples, oranges)
+targets = np.array([[56, 70],
+                    [81, 101],
+                    [119, 133],
+                    [22, 37],
+                    [103, 119]], dtype='float32')
+
+# Convert inputs and targets to tensors
+inputs = torch.from_numpy(inputs)
+targets = torch.from_numpy(targets)
+print(inputs)
+print(targets)
+
+train_ds = TensorDataset(inputs, targets)
+train_dl = DataLoader(train_ds, batch_size, shuffle=True)
+next(iter(train_dl))
+
+# Define a utility function to train the model
+def fit(num_epochs, model, loss_fn, opt):
+    for epoch in range(num_epochs):
+        for xb,yb in train_dl:
+            # Generate predictions
+            pred = model(xb)
+            loss = loss_fn(pred, yb)
+            # Perform gradient descent
+            loss.backward()
+            opt.step()
+            opt.zero_grad()
+    print('Training loss: ', loss_fn(model(inputs), targets))
+
+class SimpleNet(nn.Module):
+    # Initialize the layers
+    def __init__(self):
+        super().__init__()
+        self.linear1 = nn.Linear(3, 3)
+        self.act1 = nn.ReLU() # Activation function
+        self.linear2 = nn.Linear(3, 2)
+
+    # Perform the computation
+    def forward(self, x):
+        x = self.linear1(x)
+        x = self.act1(x)
+        x = self.linear2(x)
+        return x
+
+model = SimpleNet()
+opt = torch.optim.SGD(model.parameters(), 1e-5)
+loss_fn = F.mse_loss
+
+fit(100, model, loss_fn, opt)
+
+

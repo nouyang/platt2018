@@ -68,11 +68,8 @@ num_epochs = 20
 losses = []
 accs = []
 for e in range(num_epochs):
-
     for ix, (_x, _y) in enumerate(ds):
-
-        #=========make inpur differentiable=======================
-
+        #=========make input differentiable=======================
         _x = Variable(_x).float()
         _y = Variable(_y).float()
 
