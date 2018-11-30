@@ -11,6 +11,67 @@ grasp
 size batched grasp torch.Size([5])
 one batch of grasp labels:  tensor([3, 4, 3, 2, 4])
 
+>> ???
+
+
+ges
+i of batch:  0
+size of batched images torch.Size([5, 3, 400, 300])
+grasp
+size of batched grasp labels torch.Size([5, 2])
+one batch of grasp labels:  tensor([[336, 105],
+        [ 68,  56],
+        [297, 230],
+        [ 38, 112],
+        [331,  37]])
+----------- LOSS DEBUGGING ----
+
+sizes of outputs: torch.Size([1, 2])
+sizes of labels:  torch.Size([5, 2])
+
+outputs  tensor([[-0.1063, -0.0349]], grad_fn=<ThAddmmBackward>)
+
+labels tensor([[336, 105],
+        [ 68,  56],
+        [297, 230],
+        [ 38, 112],
+        [331,  37]])
+
+----------- LOSS DEBUGGING ----
+
+Traceback (most recent call last):
+  File "imagegen.py", line 275, in <module>
+    loss = criterion(outputs, labels)
+  File "/home/rui/v3/lib/python3.6/site-packages/torch/nn/modules/module.py", line 477, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/rui/v3/lib/python3.6/site-packages/torch/nn/modules/loss.py", line 862, in forward
+    ignore_index=self.ignore_index, reduction=self.reduction)
+  File "/home/rui/v3/lib/python3.6/site-packages/torch/nn/functional.py", line 1550, in cross_entropy
+    return nll_loss(log_softmax(input, 1), target, weight, None, ignore_index, None, reduction)
+  File "/home/rui/v3/lib/python3.6/site-packages/torch/nn/functional.py", line 1405, in nll_loss
+    .format(input.size(0), target.size(0)))
+ValueError: Expected input batch_size (1) to match target batch_size (5).
+
+
+
+
+----------- i 6757
+inputs size torch.Size([4, 3, 32, 32])
+outputs size torch.Size([4, 10])
+labels size torch.Size([4])
+
+outputs tensor([[-0.0841,  0.0786, -0.1027,  0.0942,  0.0062, -0.0385, -0.0510,  0.0095, 0.0545,  0.0020],
+        [-0.0827,  0.0794, -0.0967,  0.0939,  0.0140, -0.0365, -0.0467,  0.0084, 0.0478,  0.0092],
+        [-0.0870,  0.0823, -0.1052,  0.0957,  0.0057, -0.0463, -0.0512,  0.0141, 0.0615, -0.0029],
+        [-0.0902,  0.0920, -0.1042,  0.1039, -0.0036, -0.0450, -0.0523,  0.0104, 0.0625,  0.0015]], grad_fn=<ThAddmmBackward>)
+ground truth labels size torch.Size([4])
+
+
+labels tensor([4, 0, 5, 9])
+
+criterion = nn.CrossEntropyLoss
+loss = criterion(outputs, labels)
+
 
 >>> ???
 
@@ -19,3 +80,11 @@ https://jdhao.github.io/2017/11/15/pytorch-datatype-note/
 As another example, several loss functions like CrossEntropyLoss require that the target should be torch LongTensor. So before doing operations, make sure that your input Tensor types match the function definitions.
 
 It is easy to convert the type of one Tensor to another Tensor. Suppose x and y are Tensor of different types. You can use x.type(y.type()) or x.type_as(y) to convert x to the type of y.
+=======
+
+    x = x.view(-1, 16*5*5)
+RuntimeError: invalid argument 2: size '[-1 x 400]' is invalid for input with 558720 elements at /pytorch/aten/src/TH/THStorage.cpp:80
+
+
+>>>  changed to x = x.view(-1, 558720) by hardcoding... but why? What is this
+number?

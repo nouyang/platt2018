@@ -121,4 +121,7 @@ tags
 # Persistent undo
 [._]*.un~
 
+
 *.bak
+
+./rcnn_depth/data/*

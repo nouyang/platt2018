@@ -15,7 +15,7 @@ draw = ImageDraw.Draw(image)
 
 
 
-vertices = makeRectangle(50, 80, 0*math.pi/180, offset=(L/2+100, W/2))
+vertices = makeRectangle(50, 60, 20*math.pi/180, offset=(L/2+20, -20+W/2))
 draw.polygon(vertices, fill=1)
 
 image.save("test.png")

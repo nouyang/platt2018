@@ -62,7 +62,7 @@ block_l, block_w = 25, 25
 # block_minl, block_minw = 20, 20
 
 # number of images
-num_images = 40  
+num_images = 10  
 
 # list containing PIL Image objects?
 img_list = [] 
@@ -80,16 +80,12 @@ for i in range(num_images):
     # rand_x = np.random.randint(0, W)
     # rand_y = np.random.randint(0, H)
 
-    # TODO assume 10 locations for now
-    rand_x = np.random.randint(0, 2) #0 or 1 (does not incl. end)
-    rand_y = np.random.randint(0, 5) #0 1 2 3 4
+    rand_x = int(np.random.rand() * (W-block_l))
+    rand_y = int(np.random.rand() * (H-block_w))
 
-    # TODO remove this after fixing classes 
     # true_coords.append((rand_x, rand_y))
-    true_coords.append(rand_x*10 + rand_y)
+    true_coords.append(np.array((rand_x, rand_y)))
 
-    rand_x = 20*rand_x + 100
-    rand_y = 20*rand_y + 100
 
     idraw = ImageDraw.Draw(img)
     # idraw.rectangle((rand_x, rand_y, rand_x+block_l, rand_y+block_w), fill='white')
@@ -97,7 +93,7 @@ for i in range(num_images):
 
     img_list.append(img)
     # true_coords.append((rand_x, rand_y))
-    img.save('rect'+str(i)+'.png')
+    img.save('./data/rect'+str(i)+'.png')
 
 #print(truth_coords)
 
@@ -128,6 +124,7 @@ class RectDepthImgsDataset(Dataset):
     def __getitem__(self, idx):
         image = self.images[idx]
         coords = true_coords[idx]
+        # landmarks = landmarks.astype('float').reshape(-1, 2)
         # sample = {'image': image, 'landmarks': landmarks}
 
         if self.transform:
@@ -209,7 +206,7 @@ model = ConvNet(num_classes).to(device)
 
 
 import torch.nn.functional as F
-class Net(nn.Module): #CIFAR is 32x32x3, MNIST is 28x28x1
+class Net(nn.Module): #CIFAR is 32x32x3, MNIST is 28x28x1)
     def __init__(self):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
@@ -236,9 +233,11 @@ model = Net().to(device)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
+# criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 # Train the model
+print('Training model now...')
 total_step = len(train_loader)
 for epoch in range(num_epochs):
 
@@ -248,34 +247,38 @@ for epoch in range(num_epochs):
 
 
     # for i, (images, labels) in enumerate(train_loader):
-    for i, sample in enumerate(train_loader):
+    for i_batch, sample in enumerate(train_loader):
             # print(i_batch, sample_batched['image'].size(),
           # sample_batched['landmarks'].size())
         print('images')
-        print('i', i)
+        print('i of batch: ', i_batch)
         # EXPECT expect size_batch, channels in image, and height+length of image
-        print('size batched', sample['image'].size())
+        print('size of batched images', sample['image'].size())
         # print(type(sample['image']))
         print('grasp')
         # EXPECT 5x1
-        print('size batched grasp', sample['grasp'].view(5,-1).size())
+        print('size of batched grasp labels', sample['grasp'].size())
         # print(type(sample['grasp']))
         print('one batch of grasp labels: ', sample['grasp'])
-        images = sample['image'].to(device)
-        labels = sample['grasp'].to(device)
-        # images = images.to(device)
-        # labels = labels.to(device)
+        images = sample['image']
+        labels = sample['grasp']
+
+        images = images.to(device)
+        labels = labels.to(device)
+        optimizer.zero_grad()
         
         # Forward pass
         outputs = model(images)
         print("----------- LOSS DEBUGGING ----\n")
-        print('outputs size', 'labels size', outputs.size(), labels.size())
+        print('sizes of inputs:', images.size())
+        print('sizes of outputs:', outputs.size())
+        print('sizes of labels: ', labels.size(), '\n')
         print('outputs ',outputs, '\n')
         print('labels', labels, '\n')
+        print("----------- LOSS DEBUGGING ----\n")
         loss = criterion(outputs, labels)
         
         # Backward and optimize
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         

@@ -88,7 +88,8 @@ net.to(device)  # Use GPU
 
 # Define loss function (cross entropy) and optimizer (SGD)
 
-criterion = nn.CrossEntropyLoss()
+#criterion = nn.CrossEntropyLoss()
+criterion = nn.MSELoss()
 optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
 
@@ -105,6 +106,14 @@ for epoch in range(2):
         optimizer.zero_grad()
 
         outputs = net(inputs)
+        print('\n----------- i', i)
+        print('inputs size', inputs.size())
+        print('outputs size', outputs.size())
+        print('outputs', outputs)
+        print('ground truth labels size', labels.size())
+        print('labels', labels)
+        print('labels size', labels.size())
+        print('\n---------------------------')
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
