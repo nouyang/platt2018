@@ -11,23 +11,22 @@ nrw
 '''
 Assumptions
 # 300x400 black 'depth image'
-# 25x25 square 'blocks' (vary size, orientation) 
+# 25x25 square 'blocks' (vary size, orientation)
 # true grasps are parameterized by center and orientation (1 true grasp per square)
 # store as numpy array (later pytorch array for GPU)
 # ? 2 layer with faster-rcnn using pytorch ?
 # start with default pytorch CNN
-# start with n = 10 images 
+# start with n = 10 images
 
 '''
 
 import numpy as np
 from PIL import Image, ImageDraw
 
-import torch 
+import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
-import pandas
 
 from torch.utils.data import Dataset, DataLoader
 
@@ -49,28 +48,28 @@ from torch.utils.data import Dataset, DataLoader
 # idraw.polygon([(60,60), (90,60), (90,90), (60,90)], fill="red", outline="green")
 
 # img.save('rectangle.png')
-# 
+#
 # np.random.rand(m, n)
 # np.random.randint(low, high, size=(m,n))
-# ----- ------  
+# ----- ------
 
 
 # height and width of camera image (in pixels)
 H,W = 300,400
-# length and width of blocks (fixed for now) 
-block_l, block_w = 25, 25 
+# length and width of blocks (fixed for now)
+block_l, block_w = 25, 25
 # block_minl, block_minw = 20, 20
 
 # number of images
-num_images = 10  
+num_images = 10
 
 # list containing PIL Image objects?
-img_list = [] 
+img_list = []
 true_coords = []
 
-# 3 random numbers per image - x,y location, and orientation 
+# 3 random numbers per image - x,y location, and orientation
 # Y/N: should orientation be chunked by 15 degrees = 24 options? (YES)
-# TODO: implement rotated rectangles later 
+# TODO: implement rotated rectangles later
 # TODO: implement blocks that are halfway off-image
 
 
@@ -98,11 +97,11 @@ for i in range(num_images):
 #print(truth_coords)
 
 #####
-# Create pytorch dataloader 
+# Create pytorch dataloader
 #####
 
 
-# data loader example 
+# data loader example
 # 1) create new "rectangle" class which subclasses pytorch "Dataset" class
 # 2) use torch.utils.data.DataLoader and specify the batch size etc.
 # 3) enumerate to step through the data and update gradients
@@ -114,7 +113,7 @@ class RectDepthImgsDataset(Dataset):
     def __init__(self, PIL_images_list, true_coords, transform=None):
         """
         """
-        self.images = PIL_images_list 
+        self.images = PIL_images_list
         self.true_coords = true_coords
         self.transform = transform
 
@@ -123,16 +122,17 @@ class RectDepthImgsDataset(Dataset):
 
     def __getitem__(self, idx):
         image = self.images[idx]
-        coords = true_coords[idx]
+        coords = torch.FloatTensor(true_coords[idx])
         # landmarks = landmarks.astype('float').reshape(-1, 2)
         # sample = {'image': image, 'landmarks': landmarks}
 
         if self.transform:
-            image = self.transform(image) 
+            image = self.transform(image)
 
         #sample = {'image': image, 'grasp': str(coords[0]) + str(coords[1])}
         # TODO: not numerical classes
         sample = {'image': image, 'grasp': coords}
+        sample = image, coords
 
         return sample
 
@@ -157,16 +157,16 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # Hyper parameters
 num_epochs = 5
 num_classes = 2
-batch_size = 5 
+batch_size = 5
 learning_rate = 0.001
 
-# Dataset is depth images of rectangular blocks 
+# Dataset is depth images of rectangular blocks
 train_dataset = RectDepthImgsDataset(PIL_images_list = img_list, true_coords =
                                      true_coords,
                                      transform=transforms.ToTensor())
 
 test_dataset = RectDepthImgsDataset(PIL_images_list = img_list, true_coords =
-                                     true_coords, 
+                                     true_coords,
                                      transform=transforms.ToTensor())
 
 # Data loader
@@ -175,35 +175,6 @@ train_loader = DataLoader(dataset=train_dataset,
 
 test_loader = DataLoader(dataset=train_dataset,
                                            batch_size=batch_size, shuffle=False)
-
-'''
-# Convolutional neural network (two convolutional layers)
-# CNN
-class ConvNet(nn.Module):
-    def __init__(self, num_classes=10):
-        super(ConvNet, self).__init__()
-        self.layer1 = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=5, stride=1, padding=2),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2))
-        self.layer2 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=5, stride=1, padding=2),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2))
-        self.fc = nn.Linear(7*7*32, num_classes)
-        
-    def forward(self, x):
-        out = self.layer1(x)
-        out = self.layer2(out)
-        out = out.reshape(out.size(0), -1)
-        out = self.fc(out)
-        return out
-
-model = ConvNet(num_classes).to(device)
-'''
-
 
 import torch.nn.functional as F
 class Net(nn.Module): #CIFAR is 32x32x3, MNIST is 28x28x1)
@@ -232,8 +203,8 @@ model = Net().to(device)
 
 
 # Loss and optimizer
-criterion = nn.CrossEntropyLoss()
-# criterion = nn.MSELoss()
+# criterion = nn.CrossEntropyLoss()
+criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 # Train the model
@@ -253,20 +224,22 @@ for epoch in range(num_epochs):
         print('images')
         print('i of batch: ', i_batch)
         # EXPECT expect size_batch, channels in image, and height+length of image
-        print('size of batched images', sample['image'].size())
+        # print('size of batched images', sample['image'].size())
         # print(type(sample['image']))
         print('grasp')
         # EXPECT 5x1
-        print('size of batched grasp labels', sample['grasp'].size())
+        # print('size of batched grasp labels', sample['grasp'].size())
         # print(type(sample['grasp']))
-        print('one batch of grasp labels: ', sample['grasp'])
-        images = sample['image']
-        labels = sample['grasp']
+        # print('one batch of grasp labels: ', sample['grasp'])
+        # images = sample['image']
+        # labels = sample['grasp']
+        images = sample[0]
+        labels = sample[1]
 
         images = images.to(device)
         labels = labels.to(device)
         optimizer.zero_grad()
-        
+
         # Forward pass
         outputs = model(images)
         print("----------- LOSS DEBUGGING ----\n")
@@ -277,13 +250,13 @@ for epoch in range(num_epochs):
         print('labels', labels, '\n')
         print("----------- LOSS DEBUGGING ----\n")
         loss = criterion(outputs, labels)
-        
+
         # Backward and optimize
         loss.backward()
         optimizer.step()
-        
+
         if (i+1) % 100 == 0:
-            print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}' 
+            print ('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'
                    .format(epoch+1, num_epochs, i+1, total_step, loss.item()))
 
 ## ValueError: Expected input batch_size (1) to match target batch_size (5).
