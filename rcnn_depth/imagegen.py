@@ -18,7 +18,7 @@ num_images = 50
 true_coords = []
 
 
-# makeRectangle() credit Sparkler, stackoverflow, feb 17
+# Calc rectangle vertices. makeRectangle() credit Sparkler, stackoverflow, feb 17
 def makeRectangle(l, w, theta, offset=(0, 0)):
     c, s = math.cos(theta), math.sin(theta)
     rectCoords = [(l/2.0, w/2.0), (l/2.0, -w/2.0), (-l/2.0, -w/2.0), (-l/2.0, w/2.0)]
@@ -27,18 +27,20 @@ def makeRectangle(l, w, theta, offset=(0, 0)):
 
 # ---- Make depth images ---
 for i in range(num_images):
+    orient = 0 # degrees
     img = Image.new('RGB', (IMG_H, IMG_W), 'gray')
 
-    # offset so blocks don't run off edge
+    # block_l and _w offset so blocks don't run off edge of image
     rand_x = int(np.random.rand() * (IMG_W-block_l))
     rand_y = int(np.random.rand() * (IMG_H-block_w))
 
     true_coords.append(np.array((rand_x, rand_y)))
 
+    rect_vertices = makeRectangle(block_l, block_w, orient, offset=(rand_x,
+                                                                    rand_y))
     idraw = ImageDraw.Draw(img)
-    idraw.rectangle((rand_x, rand_y, rand_x+block_l, rand_y+block_w), fill='white')
+    idraw.polygon(rect_vertices, fill=1)
 
-    # img_list.append(img)
     img.save('./data/rect'+str(i)+'.png')
 
 
@@ -53,7 +55,7 @@ class RectDepthImgsDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        return len(self.images)
+        return len(self.true_coords)
 
     def __getitem__(self, idx):
         # image = self.images[idx]
@@ -130,8 +132,26 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         if (i+1) % 1 == 0:
-            print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}' .format(epoch+1,
+            print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch+1,
                                                                       num_epochs,
                                                                       i+1,
                                                                       total_step,
                                                                       loss.item()))
+
+def imshow_coord(img):
+    draw = ImageDraw.Draw(img)
+    draw.point(xy, options)
+    img.show()
+
+
+# get some random training images
+dataiter = iter(trainloader)
+images, labels = dataiter.next()
+
+# show images
+imshow(torchvision.utils.make_grid(images))
+
+# _, predicted = torch.max(outputs, 1)
+
+# print('Predicted: ', ' '.join('%5s' % classes[predicted[j]]
+                              # for j in range(4)))
