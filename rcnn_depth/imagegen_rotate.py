@@ -22,11 +22,19 @@ def makeRectangle(l, w, theta, offset=(0, 0)):
 
 
 # vertices = makeRectangle(50, 60, 20*math.pi/180, offset=(L/2+20, -20+W/2))
-vertices = makeRectangle(50, 50,0, offset=(100,100))
-vertices2 = makeRectangle(50, 50,0, offset=(0,0))
+orient = math.radians(45)
+vertices = makeRectangle(50, 50, orient, offset=(100,100))
+#vertices2 = makeRectangle(50, 50,10, offset=(0,0))
 draw.polygon(vertices, fill=1)
-draw.polygon(vertices2, fill=1)
-
+#draw.polygon(vertices2, fill=1)
 image.show()
-
 image.save("test.png")
+
+for i in range(36):
+    image = Image.new("1", (L, W))
+    draw = ImageDraw.Draw(image)
+    orient = math.radians(i*10)
+    vertices = makeRectangle(50, 50, orient, offset=(100,100))
+    vertices = makeRectangle(50, 50, orient, offset=(200,200))
+    draw.polygon(vertices, fill=1)
+    image.save("./data_rotated_rect/test" + str(i*10) + ".png")
