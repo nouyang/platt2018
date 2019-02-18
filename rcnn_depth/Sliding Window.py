@@ -100,9 +100,8 @@ class RectDepthImgsDataset(Dataset):
 
     def __getitem__(self, idx):
         # image = self.images[idx]
-        image = io.imread(self.img_dir + '/rect'+str(idx)+'.png')
-        image = torch.FloatTensor(image).permute(
-            2, 0, 1)  # PIL and torch expect difft orders
+        image = io.imread(self.img_dir + '/rect'+str(idx)+'.png', as_grey=True)
+        # image = torch.FloatTensor(image).permute(2, 0, 1)  # PIL and torch expect difft orders
         coords = torch.FloatTensor(self.true_coords[idx])
 
         if self.transform:
@@ -112,10 +111,11 @@ class RectDepthImgsDataset(Dataset):
                                        self.detectMargin)
 
         # sample = {'crops': crops, 'labels': labels}
-        print('\n!-- For debugging --', 'We have our labels', len(labels),
-              labels)
+        # print('\n!-- For debugging --', 'We have our labels', len(labels),
+        # labels)
 
-        return crops, labels
+        sample = image, labels
+        return sample
 
     def makeCrops(self, image, stepSize, windowSize, rectCenter, detectMargin):
         """
@@ -127,17 +127,17 @@ class RectDepthImgsDataset(Dataset):
         margin = detectMargin
         truths = []
         # TODO : look into why it's y,x !
-        print('image type in crops', type(image))
-        print('image size', image.shape)
+        #print('image type in crops', type(image))
+        #print('image size', image.shape)
         for x in range(0, image.shape[0] - windowSize[0] + 1, stepSize):
             for y in range(0, image.shape[1] - windowSize[1] + 1, stepSize):
                 end_x, end_y = x + windowSize[0], y + windowSize[1]
-                print('end_x, end_y', end_x, end_y)
+                #print('end_x, end_y', end_x, end_y)
                 hasRect = (x + margin < c_x < end_x - margin) and \
                     (y + margin < c_y < end_y - margin)
                 crops.append(image[y:end_y, x:end_x])
                 truths.append(hasRect)
-        print('length of truths in makeCrops', len(truths))
+        #print('length of truths in makeCrops', len(truths))
         return crops, truths
 
 
@@ -152,10 +152,10 @@ print(train_truth[1])
 # ------------------------------------------------------------
 
 # Hyper parameters
-num_epochs = 10
+num_epochs = 5
 num_classes = 3  # predicting x,y,orientation
 learning_rate = 0.001
-batch_size = 15
+batch_size = 3
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("CUDA available? device: ", device)
@@ -213,7 +213,8 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         self._const = int(self._const)
 
         # 3 input image channels (RGB)  .6 output channels, 5x5 square convolution
-        self.conv1 = nn.Conv2d(3, 6, _stride).to(device)
+        # NOTE: we switched to 1 input channel
+        self.conv1 = nn.Conv2d(1, 6, _stride).to(device)
         self.pool = nn.MaxPool2d(_pool, _pool).to(device)
         self.conv2 = nn.Conv2d(6, _outputlayers, _stride).to(device)
         self.fc1 = nn.Linear(self._const, 120).to(device)
@@ -227,26 +228,41 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         # self.loc_conv4_3 = nn.Conv2d(512, n_boxes['conv4_3'] * 4, kernel_size=3, padding=1)
         # Class prediction convolutions (predict classes in localization boxes)
         # self.cl_conv4_3 = nn.Conv2d(512, n_boxes['conv4_3'] * n_classes, kernel_size=3, padding=1)
-    def forward(self, x):
+    def forward(self, xx):
         # print(x.size())
         # x = x.to(device)
-        print('Making crops from the x in the NN,', type(x))
-        crops = self.makeCrops(x, self.step, self.cropSize)
-        box_class_scores = []
-        for img in crops:
-            # print(img.shape)
-            x = img.view(-1, 3, self.cropSize[0], self.cropSize[1])
-            x = self.pool(F.relu((self.conv1(x))))
-            x = self.pool(F.relu(self.conv2(x)))
-            x = x.view(-1, self._const)
-            x = F.relu(self.fc1(x))
-            x = F.relu(self.fc2(x))
-            x = self.fc3(x)
-            box_class_scores.append(x)
-        return box_class_scores
-        # TODO: maybe the last layer should have ReLu or softmax for binary?  # vs multiple classes
-        # TODO: should we run the windows through as a concat, or let the net
-        # learn from every individual window? prolly the latter
+        print('Making crops from the x in the NN,', type(xx), len(xx))
+        # TODO: presumably by doing this i lose some of the multithread goodness
+        batch_images = xx
+        batch_results = []
+        for image in batch_images:
+            print('\nHI ! \n')
+            crops = self.makeCrops(image, self.step, self.cropSize)
+            box_class_scores = []
+            # x has size (batchSize, 3, x, y)
+            for crop in crops:
+                print('\n HI 2 !\n')
+                # print(img.shape)
+                x = crop.view(-1, 1, self.cropSize[0], self.cropSize[1])
+                # NOTE we are shifting to gray scale now!!!
+                x = self.pool(F.relu((self.conv1(x))))
+                x = self.pool(F.relu(self.conv2(x)))
+                x = x.view(-1, self._const)
+                x = F.relu(self.fc1(x))
+                x = F.relu(self.fc2(x))
+                x = self.fc3(x)
+                box_class_scores.append(x)
+                print('len(box_class_scores', len(box_class_scores))
+            batch_results.append(box_class_scores)
+            print('len(batch_results)', len(batch_results))
+            # TODO: maybe the last layer should have ReLu or softmax for binary?  # vs multiple classes
+            # TODO: should we run the windows through as a concat, or let the net
+            # learn from every individual window? prolly the latter
+        batch_results = np.array(batch_results)
+        print('\nTypes!', type(box_class_scores), type(batch_results))
+        print('#--- results!', batch_results, '---')
+        # we want result to be be (batchsize, results)
+        return torch.FloatTensor(batch_results)
 
     def makeCrops(self, image, stepSize, windowSize):
         """
@@ -286,8 +302,10 @@ for epoch in range(num_epochs):
 
         # prediction = blah
 
-        print('During this batch,', i_batch, ' labels', type(labels), labels)
-        print('images', type(images), images)
+        print('\nDuring this batch,', i_batch,
+              ' labels', type(labels))  # , labels)
+        # print('images', type(images), images)
+        print('shapes of images and labels', len(images), len(labels))
         images = [img.to(device) for img in images]
         optimizer.zero_grad()
 
