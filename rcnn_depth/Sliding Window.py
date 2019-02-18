@@ -6,7 +6,7 @@ import torch.nn as nn
 from skimage import io
 import math
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, TensorDataset
 import torch.nn.functional as F
 import os
 
@@ -114,7 +114,7 @@ class RectDepthImgsDataset(Dataset):
         # print('\n!-- For debugging --', 'We have our labels', len(labels),
         # labels)
 
-        sample = image, labels
+        sample = image, torch.FloatTensor(labels)
         return sample
 
     def makeCrops(self, image, stepSize, windowSize, rectCenter, detectMargin):
@@ -206,8 +206,10 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
             return layer_size
 
         # print(self._imgx)
-        self._const = _calc(_calc(self._imgx))
-        self._const *= _calc(_calc(self._imgy))
+        #self._const = _calc(_calc(self._imgx))
+        #self._const *= _calc(_calc(self._imgy))
+        self._const = _calc(_calc(self.cropSize[0]))
+        self._const *= _calc(_calc(self.cropSize[1]))
         self._const *= _outputlayers
         # print(self._const)
         self._const = int(self._const)
@@ -233,7 +235,7 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         # x = x.to(device)
         print('Making crops from the x in the NN,', type(xx), len(xx))
         # TODO: presumably by doing this i lose some of the multithread goodness
-        batch_images = xx
+        batch_images = xx.to(device)
         batch_results = []
         for image in batch_images:
             print('\nHI ! \n')
@@ -243,7 +245,8 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
             for crop in crops:
                 print('\n HI 2 !\n')
                 # print(img.shape)
-                x = crop.view(-1, 1, self.cropSize[0], self.cropSize[1])
+                x = crop.view(-1, 1, self.cropSize[0],
+                              self.cropSize[1]).float().to(device)
                 # NOTE we are shifting to gray scale now!!!
                 x = self.pool(F.relu((self.conv1(x))))
                 x = self.pool(F.relu(self.conv2(x)))
@@ -262,6 +265,8 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         print('\nTypes!', type(box_class_scores), type(batch_results))
         print('#--- results!', batch_results, '---')
         # we want result to be be (batchsize, results)
+        # batch_results = \
+        # TensorDataset(torch.from_numpy(batch_results).float())
         return torch.FloatTensor(batch_results)
 
     def makeCrops(self, image, stepSize, windowSize):
@@ -306,7 +311,10 @@ for epoch in range(num_epochs):
               ' labels', type(labels))  # , labels)
         # print('images', type(images), images)
         print('shapes of images and labels', len(images), len(labels))
-        images = [img.to(device) for img in images]
+        images = images.to(device)
+        labels = labels.to(device)
+        #images = [img.to(device) for img in images]
+        #labels = [lbl.to(device) for lbl in labels]
         optimizer.zero_grad()
 
         # Forward pass
