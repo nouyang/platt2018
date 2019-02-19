@@ -174,7 +174,10 @@ class MultiObjLoss(nn.Module):
         :return: multibox loss, a scalar
         """
         #batch_size = predicted_locs.size(0)
-        print('Predicted locs size', predicted_locs.size)
+        #print('\n<<--- locs size', coords.size(), '--->>>')
+        predicted_locs = predicted_locs.view(-1,
+                                             coords.size(1), coords.size(2))
+        #print('\n<<--- Predicted locs size', predicted_locs.size(), '--->>>')
 
         loc_loss = self.smooth_l1(predicted_locs, coords)
         conf_loss = self.cross_entropy(predicted_classes, labels)
