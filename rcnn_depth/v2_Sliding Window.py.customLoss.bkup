@@ -149,7 +149,6 @@ class RectDepthImgsDataset(Dataset):
 
 # -- Define Loss -------------------------------------------------------
 
-'''
 class MultiObjLoss(nn.Module):
     """
     The MultiBox loss, a loss function for object detection.
@@ -160,7 +159,7 @@ class MultiObjLoss(nn.Module):
 
     def __init__(self):
         super(MultiObjLoss, self).__init__()
-        # self.smooth_l1 = nn.L1Loss()
+        #self.smooth_l1 = nn.L1Loss()
         self.smooth_l1 = nn.SmoothL1Loss()
         self.cross_entropy = nn.BCELoss()
         self.alpha = 1  # some weighting between class vs regr loss
@@ -168,23 +167,23 @@ class MultiObjLoss(nn.Module):
     def forward(self, predicted_locs, predicted_classes, coords, labels):
         """
         Forward propagation.
-        : param predicted_locs: predicted locations/boxes w.r.t the 8732 prior boxes, a tensor of dimensions(N, 8732, 4)
-        : param predicted_scores: class scores for each of the encoded locations/boxes, a tensor of dimensions(N, 8732, n_classes)
-        : param boxes: true object bounding boxes in boundary coordinates, a list of N tensors
-        : param labels: true object labels, a list of N tensors
-        : return: multibox loss, a scalar
+        :param predicted_locs: predicted locations/boxes w.r.t the 8732 prior boxes, a tensor of dimensions (N, 8732, 4)
+        :param predicted_scores: class scores for each of the encoded locations/boxes, a tensor of dimensions (N, 8732, n_classes)
+        :param boxes: true object bounding boxes in boundary coordinates, a list of N tensors
+        :param labels: true object labels, a list of N tensors
+        :return: multibox loss, a scalar
         """
-        # batch_size = predicted_locs.size(0)
-        # print('\n<<--- locs size', coords.size(), '--->>>')
+        #batch_size = predicted_locs.size(0)
+        #print('\n<<--- locs size', coords.size(), '--->>>')
         predicted_locs = predicted_locs.view(-1,
                                              coords.size(1), coords.size(2))
-        # print('\n<<--- Predicted locs size', predicted_locs.size(), '--->>>')
+        #print('\n<<--- Predicted locs size', predicted_locs.size(), '--->>>')
 
         loc_loss = self.smooth_l1(predicted_locs, coords)
         conf_loss = self.cross_entropy(predicted_classes, labels)
 
         return conf_loss + self.alpha * loc_loss
-'''
+
 
 # -- Define NN -------------------------------------------------------
 
@@ -260,7 +259,7 @@ class myNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         """
         Forward propogation
         :param image: images, a tensor of dimensions (N, 3, IMG_X, IMG_Y)
-        :return: (x,y, theta) and T/F for each window
+        :return: (x,y, theta) and T/F for each window 
         """
         # TODO: Wait, if we're going to return a regression for each window,
         # do we even need classif? We can just say (-99,-99) to denote no rect
@@ -279,16 +278,8 @@ class myNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         # gray=1
         # we want, batch_size, [100x100]*numcrops 4 dims
         # TODO is this even right # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! <<<<-----------------------
-
-        #print('before shaping: ', all_crops.size())
         feats = all_crops.view(-1, self.numCrops, self.cropSize[0],
                                self.cropSize[1]).to(device)
-
-        print('before shaping: ', all_crops.size(), 'after shaping: ',
-              feats.size())
-
-        # feats size before shaping:  torch.Size([15, 9, 100, 100])
-        # aka: (batchsize, numWindows, windowsizeX, windowsizeY)
 
         # CLASSIFICATION of the windows
         c_crops = self.c_pool(F.relu((self.c_conv1(feats))))
@@ -299,10 +290,8 @@ class myNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         c_crops = self.c_fc3(c_crops)
         c_crops = self.c_sigmoid(c_crops)
 
-        regr_input = self.pickGoodCrops(c_crops, feats)
-
         # LOCALIZATION
-        regr_crops = self.l_pool(F.relu((self.l_conv1(regr_input))))
+        regr_crops = self.l_pool(F.relu((self.l_conv1(feats))))
         regr_crops = self.l_pool(F.relu(self.l_conv2(regr_crops)))
         regr_crops = regr_crops.view(-1, self._const)
         regr_crops = F.relu(self.l_fc1(regr_crops))
@@ -313,14 +302,6 @@ class myNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         containsRect = c_crops
         rectCoords = regr_crops
         return containsRect, rectCoords
-
-    def pickGoodCrops(self, classified_crops, crops):
-        goodCrops = []
-        for i, crop in enumerate(crops):
-            if classified_crops[i]:
-                goodCrops.append(crop)
-        goodCrops = torch.stack(goodCrops)
-        return goodCrops
 
     def makeCrops(self, image, stepSize, windowSize):
         """
@@ -421,12 +402,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
         # Forward pass
         predicted_class, predicted_locs = model(images)
-        predicted_class = modelClass(iage)_
-
-        predicted_regr = modelRegr(image, goodCrops)
-
-        loss = BCELoss(predicted_class, labels) + MSE(predicted_locs, coords)
-        lossregr = 
+        loss = criterion(predicted_locs, predicted_class, coords, labels)
 
         # Backward prop
         optimizer.zero_grad()
@@ -542,7 +518,7 @@ workers = 4  # number of workers for loading data in the DataLoader
 model = myNet(IMG_X, IMG_Y)
 model = model.to(device)
 
-# criterion = nn.BCELoss()
+#criterion = nn.BCELoss()
 criterion = MultiObjLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,
