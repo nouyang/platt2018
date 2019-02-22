@@ -301,8 +301,8 @@ class classifNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         feats = all_crops.view(-1, self.numCrops, self.cropSize[0],
                                self.cropSize[1]).to(device)
 
-        print('before shaping: ', all_crops.size(), 'after shaping: ',
-              feats.size())
+        # print('before shaping: ', all_crops.size(), 'after shaping: ',
+        # feats.size())
 
         # feats size before shaping:  torch.Size([15, 9, 100, 100])
         # aka: (batchsize, numWindows, windowsizeX, windowsizeY)
@@ -494,17 +494,16 @@ def train(train_loader, classifModel, regrModel, classifCriterion,
         #labels_est = copy.deepcopy(predicted_class)
         #coords_est = copy.deepcopy(predicted_coords)
         labels_est = torch.FloatTensor(predicted_class.detach().cpu().numpy())
-        coords_est = torch.FloatTensor(predicted_coords.detach().cpu().numpy())
 
         mask2 = torch.round(labels_est).type_as(coords)
         mask2.unsqueeze_(2)
-        print('!---- mask2 size', mask2.size(),
-              'coords2 size', predicted_coords.size())
+        # print('!---- mask2 size', mask2.size(),
+        # 'coords2 size', predicted_coords.size())
         mask2 = mask2.repeat(1, 1, 3)
-        print('!---- mask2 size', mask2.size(),
-              'coords size', predicted_coords.size())
+        # print('!---- mask2 size', mask2.size(),
+        # 'coords size', predicted_coords.size())
         masked_est = mask2 * predicted_coords
-        print('!---- masked est size', masked_est.size())
+        # print('!---- masked est size', masked_est.size())
 
         # mask = c.reshape(-1, c.size()[1], 1,
         #                 1).repeat(1, 1, zee, zed)  # add a dims
@@ -513,13 +512,13 @@ def train(train_loader, classifModel, regrModel, classifCriterion,
 
         #mask_ = predicted_class.nonzero().type_as(all_crops)
 
-        print('!---- truth labels', labels)
-        print('!---- truth coords', coords)
-        print('!---- masked truth coords', masked_truth)
+        # print('!---- truth labels', labels)
+        # print('!---- truth coords', coords)
+        # print('!---- masked truth coords', masked_truth)
 
-        print('!---- predicted labels', predicted_class)
-        print('!---- predicted coords', predicted_coords)
-        print('!---- masked coords est', masked_est)
+        # print('!---- predicted labels', predicted_class)
+        # print('!---- predicted coords', predicted_coords)
+        # print('!---- masked coords est', masked_est)
         loss2 = regrCriterion(masked_est, masked_truth)
         optimizer2.zero_grad()
         loss2.backward()
@@ -572,16 +571,22 @@ def validate(val_loader, c_model, r_model, c_criterion, r_criterion):
             labels = labels.to(device)
             coords = coords.to(device)
 
-            # Forward pass
-            predicted_class, all_crops = classifNet(images)
+            predicted_class, all_crops = classifModel(images)
             loss1 = c_criterion(predicted_class, labels)
 
-            # Get list of crops containing objects
-            objectCrops = pickGoodCrops(predicted_class, all_crops)
+            predicted_coords = regrModel(all_crops)
 
-            # Forward pass
-            predicted_coords = regrModel(objectCrops)
-            loss2 = r_criterion(predicted_coords, coords)
+            labels_est = torch.FloatTensor(
+                predicted_class.detach().cpu().numpy())
+
+            mask2 = torch.round(labels_est).type_as(coords)
+            mask2.unsqueeze_(2)
+            mask2 = mask2.repeat(1, 1, 3)
+
+            masked_est = mask2 * predicted_coords
+            masked_truth = coords
+
+            loss2 = r_criterion(masked_est, masked_truth)
 
             losses.update(loss1.item() + loss2.item(), images.size(0))
 
@@ -632,7 +637,7 @@ learning_rate = 0.001
 start_epoch = 0  # start at this epoch
 # number of epochs since there was an improvement in the validation metric
 epochs_since_improvement = 0
-best_loss = 1.0  # assume a high loss at first
+best_loss = 1000.0  # assume a high loss at first
 workers = 4  # number of workers for loading data in the DataLoader
 
 classifModel = classifNet(IMG_X, IMG_Y)
@@ -677,7 +682,7 @@ def main():
 
         # One epoch's validation
         val_loss = validate(val_loader=test_loader,
-                            C_model=classifModel, r_model=regrModel,
+                            c_model=classifModel, r_model=regrModel,
                             c_criterion=classifCriterion,
                             r_criterion=regrCriterion)
 
