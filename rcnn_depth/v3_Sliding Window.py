@@ -24,7 +24,6 @@ import matplotlib.pyplot as plt
 import time
 import os
 
-
 # In[2]:
 
 
@@ -492,7 +491,12 @@ def train(train_loader, classifModel, regrModel, classifCriterion,
 
         predicted_coords = regrModel(all_crops)
 
-        mask2 = torch.round(predicted_class).type_as(coords)
+        #labels_est = copy.deepcopy(predicted_class)
+        #coords_est = copy.deepcopy(predicted_coords)
+        labels_est = torch.FloatTensor(predicted_class.detach().cpu().numpy())
+        coords_est = torch.FloatTensor(predicted_coords.detach().cpu().numpy())
+
+        mask2 = torch.round(labels_est).type_as(coords)
         mask2.unsqueeze_(2)
         print('!---- mask2 size', mask2.size(),
               'coords2 size', predicted_coords.size())
@@ -517,51 +521,10 @@ def train(train_loader, classifModel, regrModel, classifCriterion,
         print('!---- predicted coords', predicted_coords)
         print('!---- masked coords est', masked_est)
         loss2 = regrCriterion(masked_est, masked_truth)
-
         optimizer2.zero_grad()
         loss2.backward()
 
         optimizer2.step()
-
-        # Get list of crops containing objects
-        # objectCrops = pickGoodCrops(predicted_class, all_crops)
-
-        # 3 outputs: x,y,theta
-        # print('size objectcrops', objectCrops.size())
-        # predicted_class *
-        # c = pickGoodCrops(predicted_class, all_crops)
-        # print('\n!-- length of good crops', len(c), len(c[0]), len(c[1]))
-        # for (i, crop) in enumerate(c):
-        mask = coords[i].nonzero().type_as(crop)
-        # lets just assume batchsize = 1 for now... ?
-        # NOTE: otherwise, cannot keep length constent to get an array
-        # since some images in batch will have 1 tru3, or 2 true crops
-        # Note: do we only want regr to see positive eexamples?
-        # if it gets a blank image in the future, by accident form the
-        # classifier, should we expect reasonable behavior?
-        # eh whatever
-
-        # add a dimension (pretend-o batch dimension)
-        crop = crop.unsqueeze_(1)
-        predicted_coords = regrModel(crop)
-        true_coords = labels * crop
-        # numGoodCrops x 3 (x,y,theta)
-
-        # print('true coords', true_coords)
-        # print('predicted_coords', predicted_coords)
-        loss2 = regrCriterion(predicted_coords, true_coords)
-
-        optimizer2.zero_grad()
-        loss2.backward()
-
-        optimizer2.step()
-
-        # goodNums = np.argwhere(classif[][i] > 0)
-        # goodCrops = V
-
-        # we want... cropsnew = batchsize x numTrueCrops x imgX x imgY
-
-        # Update model
 
         losses.update(loss1.item() + loss2.item(), images.size(0))
         batch_time.update(time.time() - start)
