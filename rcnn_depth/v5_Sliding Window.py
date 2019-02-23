@@ -265,8 +265,8 @@ class classifNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         # T/F for now
 
         # calculate number of crops
-        for x in range(0, IMG_Y - WINDOWSIZE[0] + 1, STEPSIZE):
-            for y in range(0, IMG_X - WINDOWSIZE[1] + 1, STEPSIZE):
+        for y in range(0, IMG_Y - WINDOWSIZE[0] + 1, STEPSIZE):
+            for x in range(0, IMG_X - WINDOWSIZE[1] + 1, STEPSIZE):
                 self.numCrops += 1
 
         def _calc(val):  # use to calculate layer sizes
@@ -458,6 +458,7 @@ def train(train_loader, classifModel, regrModel, classifCriterion,
     losses2 = AverageMeter()  # loss
 
     for i_batch, (images, labels, coords) in enumerate(train_loader):
+        #print('\n!--- \n training regression!')
         data_time.update(time.time() - start)
 
         images = images.to(device)
