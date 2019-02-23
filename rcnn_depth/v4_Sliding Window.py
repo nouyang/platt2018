@@ -71,12 +71,12 @@ def make_dataset(dirname, num_images):
 
 
 # NOTE Define size of dataset
-# train_truth = make_dataset("data", 500)
+train_truth = make_dataset("data", 1000)
 # print(len(train_truth))
-# test_truth = make_dataset("./data/test", 300)
+test_truth = make_dataset("./data/test", 300)
 
-# np.save("train_truth.npy", train_truth)
-# np.save("test_truth.npy", test_truth)
+np.save("train_truth.npy", train_truth)
+np.save("test_truth.npy", test_truth)
 
 
 train_truth = np.load("train_truth.npy")
@@ -414,63 +414,33 @@ def train(train_loader, c_model, r_model, classifCriterion,
         # we'll do it batchsize x 1 crop at a time...
         # coords = batchsize, numcrops, x,y, theta
         for i in range(9):
-            print('!-- ', all_crops.size())
+            # print('!-- ', all_crops.size())
             batchcrop = all_crops[:, i, :, :]
             batchcrop.unsqueeze_(1)
-            print('!-- ', batchcrop.size())
+            # print('!-- ', batchcrop.size())
 
-            print('!--', cropCoords.size())
+            # print('!--', cropCoords.size())
             offset = cropCoords[i]
             # pad with column of zeros - don't touch the theta
-            print('!--', offset.size())
+            # print('!--', offset.size())
             offset = offset.repeat(all_crops.size(0), 1)
             offset = torch.cat((offset, torch.zeros((all_crops.size(0),
                                                      1)).to(device)),
                                dim=1)
             center_truth = coords[:, i, :]
 
-            center_est = r_model(batchcrop)
-            print('!-- ', center_est)
-            print('!-- ', offset)
+            center_est = r_model(batchcrop).to(device)
+            # print('!-- ', center_est)
+            # print('!-- ', offset)
             center_est = center_est + offset
 
             loss2 = regrCriterion(center_truth, center_est)
             optimizer2.zero_grad()
             loss2.backward()
             optimizer2.step()
+            losses2.update(loss2.item())
 
-        # #labels_est = copy.deepcopy(predicted_class)
-        # #coords_est = copy.deepcopy(predicted_coords)
-        # labels_est = torch.FloatTensor(predicted_class.detach().cpu().numpy())
-# #
-        # mask2 = torch.round(labels_est).type_as(coords)
-        # mask2.unsqueeze_(2)
-        # # print('!---- mask2 size', mask2.size(),
-        # # 'coords2 size', predicted_coords.size())
-        # mask2 = mask2.repeat(1, 1, 3)
-        # # print('!---- mask2 size', mask2.size(),
-        # # 'coords size', predicted_coords.size())
-        # #masked_est = mask2 * predicted_coords
-        # print('!---- masked est size', masked_est.size())
-
-        # mask = c.reshape(-1, c.size()[1], 1,
-        #                 1).repeat(1, 1, zee, zed)  # add a dims
-        # print('mask size', mask.size(), zee, zed)
-        # goodCrops = mask * crops
-
-        # mask_ = predicted_class.nonzero().type_as(all_crops)
-
-        # print('!---- truth labels', labels)
-        # print('!---- truth coords', coords)
-        # print('!---- masked truth coords', masked_truth)
-
-        # print('!---- predicted labels', predicted_class)
-        # print('!---- predicted coords', predicted_coords)
-        # print('!---- masked coords est', masked_est)
-
-        # losses.update(loss1.item() + loss2.item())
         losses.update(loss1.item())
-        losses2.update(loss2.item())
         batch_time.update(time.time() - start)
         start = time.time()
 
@@ -522,29 +492,31 @@ def validate(val_loader, c_model, r_model, c_criterion, r_criterion):
             coords = coords.to(device)
 
             # CLASSIFICATION Eval
-            predicted_class, all_crops = c_model(images)
+            predicted_class, all_crops, cropCoords = c_model(images)
             loss1 = c_criterion(predicted_class, labels)
 
+            all_crops = all_crops.to(device)
+            cropCoords = cropCoords.to(device)
+
             # REGRESSION Eval
-            predicted_coords = r_model(all_crops)
 
-            # labels_est = torch.FloatTensor(
-            # predicted_class.detach().cpu().numpy())
+            for i in range(9):
+                batchcrop = all_crops[:, i, :, :]
+                batchcrop.unsqueeze_(1)
+                offset = cropCoords[i]
+                offset = offset.repeat(all_crops.size(0), 1)
+                offset = torch.cat((offset, torch.zeros((all_crops.size(0),
+                                                         1)).to(device)),
+                                   dim=1)
+                center_truth = coords[:, i, :]
 
-            # mask2 = torch.round(labels_est).type_as(coords)
-            # mask2.unsqueeze_(2)
-            # mask2 = mask2.repeat(1, 1, 3)
+                center_est = r_model(batchcrop).to(device)
+                center_est = center_est + offset
 
-            # masked_est = mask2 * predicted_coords
-            # For validation, dn't mask
-            masked_est = predicted_coords
-            masked_truth = coords
+                loss2 = regrCriterion(center_truth, center_est)
+                losses2.update(loss2.item())
 
-            loss2 = r_criterion(masked_est, masked_truth)
-
-            # losses.update(loss1.item() + loss2.item(), images.size(0))
             losses.update(loss1.item())
-            losses2.update(loss2.item())
 
             batch_time.update(time.time() - start)
             start = time.time()
@@ -593,7 +565,7 @@ test_loader = DataLoader(dataset=test_dataset,
 
 # -- Hyperparamaters -------------------------
 
-num_epochs = 100  # number of epochs to run without early-stopping
+num_epochs = 50  # number of epochs to run without early-stopping
 learning_rate = 0.001
 
 start_epoch = 0  # start at this epoch
@@ -611,6 +583,8 @@ regrModel = regrModel.to(device)
 # criterion = nn.BCELoss()
 classifCriterion = nn.BCELoss()
 regrCriterion = nn.MSELoss()
+#regrCriterion = nn.SmoothL1Loss()
+
 optimizer1 = torch.optim.Adam(classifModel.parameters(), lr=learning_rate)
 optimizer2 = torch.optim.Adam(regrModel.parameters(), lr=learning_rate)
 
@@ -765,7 +739,7 @@ def plotResults():
 
         # # Loss
         # #loss2 = r_criterion(masked_est, masked_truth)
-        # loss2 = r_criterion(predicted_coords, coords)
+        loss2 = r_criterion(predicted_coords, coords)
 
     print("loss across batch size of ", labels.size()[0], 'is: ', loss, loss2)
 

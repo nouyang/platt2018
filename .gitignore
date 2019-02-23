@@ -126,3 +126,5 @@ tags
 
 rcnn_depth/data/*
 *.tar
+
+*.npy
