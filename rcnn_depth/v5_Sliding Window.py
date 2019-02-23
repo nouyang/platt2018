@@ -72,7 +72,7 @@ def make_dataset(dirname, num_images):
 
 
 # NOTE Define size of dataset
-# train_truth = make_dataset("data", 1500)
+# train_truth = make_dataset("data", 500)
 # print(len(train_truth))
 # test_truth = make_dataset("./data/test", 300)
 
@@ -85,6 +85,7 @@ test_truth = np.load("test_truth.npy")  # loading the training and testing data
 
 
 # Define Dataloader -------------------------------------------------------
+
 class RectDepthImgsDataset(Dataset):
     """Artificially generated depth images dataset"""
 
@@ -207,14 +208,19 @@ class regrNet(nn.Module):
         self.fc2 = nn.Linear(120, 84).to(device)
         self.fc3 = nn.Linear(84, self.numOutputs * self.numCrops).to(device)
 
-    def forward(self, crops):
+    def forward(self, crops, labels):
         """
         Forward propogation
         : param image: images, a tensor of dimensions(N, 3, IMG_X, IMG_Y)
         : return: (x, y, theta) and T/F for each window
         """
         # TODO: presumably by doing this i lose some of the multithread goodness
+        # print('!--label ', labels)
+        # print('!--label size', labels.size)
+        # print('!--crops size', crops.size)
         crops = crops.to(device)
+
+        crops = self.zeroCrops(crops, labels)
 
         # LOCALIZATION
         regr_crops = self.pool(F.relu((self.conv1(crops))))
@@ -228,6 +234,15 @@ class regrNet(nn.Module):
         # reshape to batchsize x number of crops x 3
         objCoords = objCoords.reshape(-1, self.numCrops, self.numOutputs)
         return objCoords
+
+    def zeroCrops(self, crops, labels):
+        # 15 x 9
+        # 15 x 9 x 100 x 100
+        labels = torch.FloatTensor(labels).to(device)
+        mask = labels.unsqueeze(2)
+        mask.unsqueeze_(3)
+        crops = crops * mask
+        return crops
 
 
 class classifNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
@@ -293,19 +308,8 @@ class classifNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
             all_crops.append(crops)
             # all_crops.append(crops)
         all_crops = torch.stack(all_crops)
-        # gray=1
-        # we want, batch_size, [100x100]*numcrops 4 dims
-        # TODO is this even right # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! <<<<-----------------------
-
-        # print('before shaping: ', all_crops.size())
         feats = all_crops.view(-1, self.numCrops, self.cropSize[0],
                                self.cropSize[1]).to(device)
-
-        # print('before shaping: ', all_crops.size(), 'after shaping: ',
-        # feats.size())
-
-        # feats size before shaping:  torch.Size([15, 9, 100, 100])
-        # aka: (batchsize, numWindows, windowsizeX, windowsizeY)
 
         # CLASSIFICATION of the windows
         c_crops = self.pool(F.relu((self.conv1(feats))))
@@ -337,7 +341,6 @@ class classifNet(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28x1)
         # self.numCrops=len(crops)
         return crops
 
-
 # -- Utility fxn -------------------------------------------------------
 # Source: https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection/blob/master/train.py
 
@@ -364,25 +367,28 @@ class AverageMeter(object):
 
 
 def save_checkpoint(
-    epoch, epochs_since_improvement, model, optimizer, loss, best_loss, is_best
+    epoch, epochs_since_improvement, model1, model2, optimizer1, optimizer2, loss, loss2, best_loss, is_best
 ):
     """
     Save model checkpoint.
-    : param epoch: epoch number
-    : param epochs_since_improvement: number of epochs since last improvement
-    : param model: model
-    : param optimizer: optimizer
-    : param loss: validation loss in this epoch
-    : param best_loss: best validation loss achieved so far(not necessarily in this checkpoint)
-    : param is_best: is this checkpoint the best so far?
+    :param epoch: epoch number
+    :param epochs_since_improvement: number of epochs since last improvement
+    :param model: model
+    :param optimizer: optimizer
+    :param loss: validation loss in this epoch
+    :param best_loss: best validation loss achieved so far (not necessarily in this checkpoint)
+    :param is_best: is this checkpoint the best so far?
     """
     state = {
         "epoch": epoch,
         "epochs_since_improvement": epochs_since_improvement,
         "loss": loss,
+        "loss2": loss2,
         "best_loss": best_loss,
-        "model": model,
-        "optimizer": optimizer,
+        "model1": model1,
+        "model2": model2,
+        "optimizer1": optimizer1,
+        "optimizer2": optimizer2,
     }
     filename = "checkpoint_v2sliding.pth.tar"
     torch.save(state, filename)
@@ -392,43 +398,6 @@ def save_checkpoint(
 
 
 # -- Define Train and Valid fxn -------------------------------------------------------
-
-def pickGoodCrops(classified_crops, crops):
-
-    print('classif crop size, crops size',
-          classified_crops.size(), crops.size())
-    c = torch.round(classified_crops)
-
-    all_goodCrops = []
-    for i in range(c.size(0)):  # for each batch
-        goodCrops = []
-        for (j, label) in enumerate(c[i, :]):
-            if label > 0:
-                # print('i, j, size of crops', i, j, crops.size())
-                goodCrops.append(crops[i, j, :, :])
-                # ValueError: only one element tensors can be converted to Python scalars
-        goodCrops = torch.stack(goodCrops)
-        all_goodCrops.append(goodCrops)
-    # all_goodCrops = torch.stack(all_goodCrops)
-    # print(all_goodCrops.size())
-
-    # c = torch.round(predicted_cl
-    # crops = batchsize x numcrops x imgX x imgY
-    # classif = batchsize x numcrops
-
-    # mask = c.reshape(-1, c.size()[1], 1,
-    #                 1).repeat(1, 1, zee, zed)  # add a dims
-    # print('mask size', mask.size(), zee, zed)
-    # goodCrops = mask * crops
-    #
-    # print('masked crops', goodCrops.size(), mask, goodCrops)
-    # for i, cropList in enumerate(crops):
-    # currImg = crops[i]
-    # if classified_crops[i]:
-    # goodCrops.append(crop)
-    # goodCrops = torch.stack(goodCrops)
-    return all_goodCrops
-
 
 def train(train_loader, classifModel, regrModel, classifCriterion,
           regrCriterion, optimizer1, optimizer2, epoch):
@@ -455,77 +424,18 @@ def train(train_loader, classifModel, regrModel, classifCriterion,
 
         images = images.to(device)
         labels = labels.to(device)
-        coords = coords.to(device)
 
         # Forward pass
-        # predicted_class, predicted_locs = model(images)
         predicted_class, all_crops = classifModel(images)
 
-        # print('size of predicted vs labels',
-        # predicted_class, labels)
-        # print('size of predicted vs labels',
-        # predicted_class.size(), labels.size())
         loss1 = classifCriterion(predicted_class, labels)
         optimizer1.zero_grad()
         loss1.backward()
+
         # Update model
         optimizer1.step()
+        losses.update(loss1.item())
 
-        # numGoodCrops x 3 (x,y,theta)
-
-        '''
-        # print('true coords', true_coords)
-        # print('predicted_coords', predicted_coords)
-        mask = torch.round(labels).type_as(coords)
-        print('!---- labels size', labels.size(), 'coords size', coords.size(),
-              'all_crops size', all_crops.size())
-        mask.unsqueeze_(2)
-        # crop = crop.unsqueeze_(1)
-        print('!---- mask size', mask.size(), 'coords size', coords.size())
-        mask = mask.repeat(1, 1, 3)
-        print('!---- mask size', mask.size(), 'coords size', coords.size())
-        masked_truth = mask * coords
-        print('!---- masked_truth size', masked_truth.size())
-        '''
-        masked_truth = coords
-
-        predicted_coords = regrModel(all_crops)
-
-        #labels_est = copy.deepcopy(predicted_class)
-        #coords_est = copy.deepcopy(predicted_coords)
-        labels_est = torch.FloatTensor(predicted_class.detach().cpu().numpy())
-
-        mask2 = torch.round(labels_est).type_as(coords)
-        mask2.unsqueeze_(2)
-        # print('!---- mask2 size', mask2.size(),
-        # 'coords2 size', predicted_coords.size())
-        mask2 = mask2.repeat(1, 1, 3)
-        # print('!---- mask2 size', mask2.size(),
-        # 'coords size', predicted_coords.size())
-        masked_est = mask2 * predicted_coords
-        # print('!---- masked est size', masked_est.size())
-
-        # mask = c.reshape(-1, c.size()[1], 1,
-        #                 1).repeat(1, 1, zee, zed)  # add a dims
-        # print('mask size', mask.size(), zee, zed)
-        # goodCrops = mask * crops
-
-        #mask_ = predicted_class.nonzero().type_as(all_crops)
-
-        # print('!---- truth labels', labels)
-        # print('!---- truth coords', coords)
-        # print('!---- masked truth coords', masked_truth)
-
-        # print('!---- predicted labels', predicted_class)
-        # print('!---- predicted coords', predicted_coords)
-        # print('!---- masked coords est', masked_est)
-        loss2 = regrCriterion(masked_est, masked_truth)
-        optimizer2.zero_grad()
-        loss2.backward()
-
-        optimizer2.step()
-
-        losses.update(loss1.item() + loss2.item(), images.size(0))
         batch_time.update(time.time() - start)
         start = time.time()
 
@@ -543,7 +453,51 @@ def train(train_loader, classifModel, regrModel, classifCriterion,
                 )
             )
         # free some memory since their histories may be stored
-        del predicted_class, predicted_coords, images, labels, coords
+        del predicted_class, images, labels, all_crops
+
+    losses2 = AverageMeter()  # loss
+
+    for i_batch, (images, labels, coords) in enumerate(train_loader):
+        data_time.update(time.time() - start)
+
+        images = images.to(device)
+        coords = coords.to(device)
+
+        # Forward pass
+        predicted_class, all_crops = classifModel(images)
+
+        # Forward pass
+        labelly = predicted_class.detach().cpu().numpy()
+        predicted_coords = regrModel(all_crops, labelly)
+
+        loss2 = regrCriterion(predicted_coords, coords)
+        optimizer2.zero_grad()
+        loss2.backward()
+
+        optimizer2.step()
+
+        batch_time.update(time.time() - start)
+        start = time.time()
+
+
+a
+  losses2.update(loss2.item())
+
+   # Print status
+   if i_batch % print_freq == 0:
+        print(
+            "Epoch: [{0}][{1}/{2}]\t"
+            "Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
+            "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
+                epoch,
+                i_batch,
+                len(train_loader),
+                batch_time=batch_time,
+                loss=losses,
+            )
+        )
+    # free some memory since their histories may be stored
+    del predicted_class, predicted_coords, images, coords, all_crops
 
 
 def validate(val_loader, c_model, r_model, c_criterion, r_criterion):
@@ -559,6 +513,7 @@ def validate(val_loader, c_model, r_model, c_criterion, r_criterion):
 
     batch_time = AverageMeter()
     losses = AverageMeter()
+    losses2 = AverageMeter()
 
     start = time.time()
 
@@ -571,24 +526,16 @@ def validate(val_loader, c_model, r_model, c_criterion, r_criterion):
             labels = labels.to(device)
             coords = coords.to(device)
 
-            predicted_class, all_crops = classifModel(images)
-            loss1 = c_criterion(predicted_class, labels)
+            predicted_class, all_crops = c_model(images)
+            loss = c_criterion(predicted_class, labels)
 
-            predicted_coords = regrModel(all_crops)
+            labelly = predicted_class.detach().cpu().numpy()
+            predicted_coords = r_model(all_crops, labelly)
 
-            labels_est = torch.FloatTensor(
-                predicted_class.detach().cpu().numpy())
+            loss2 = r_criterion(predicted_coords, coords)
 
-            mask2 = torch.round(labels_est).type_as(coords)
-            mask2.unsqueeze_(2)
-            mask2 = mask2.repeat(1, 1, 3)
-
-            masked_est = mask2 * predicted_coords
-            masked_truth = coords
-
-            loss2 = r_criterion(masked_est, masked_truth)
-
-            losses.update(loss1.item() + loss2.item(), images.size(0))
+            losses.update(loss.item())
+            losses2.update(loss2.item())
 
             batch_time.update(time.time() - start)
             start = time.time()
@@ -631,7 +578,7 @@ test_loader = DataLoader(dataset=test_dataset,
 
 # -- Hyperparamaters -------------------------
 
-num_epochs = 30  # number of epochs to run without early-stopping
+num_epochs = 5  # number of epochs to run without early-stopping
 learning_rate = 0.001
 
 start_epoch = 0  # start at this epoch
@@ -699,8 +646,9 @@ def main():
             epochs_since_improvement = 0
 
         # Save checkpoint
-        save_checkpoint(epoch, epochs_since_improvement, classifModel, optimizer1,
-                        val_loss, best_loss, is_best)
+
+        save_checkpoint(epoch, epochs_since_improvement, classifModel, regrModel, optimizer1,
+                        optimizer2, val_loss, regr_loss, best_loss, is_best)
 
     print("All ready!")
 
