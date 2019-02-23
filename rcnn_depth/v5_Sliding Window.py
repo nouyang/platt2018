@@ -479,25 +479,23 @@ def train(train_loader, classifModel, regrModel, classifCriterion,
         batch_time.update(time.time() - start)
         start = time.time()
 
+        losses2.update(loss2.item())
 
-a
-  losses2.update(loss2.item())
-
-   # Print status
-   if i_batch % print_freq == 0:
-        print(
-            "Epoch: [{0}][{1}/{2}]\t"
-            "Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
-            "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
-                epoch,
-                i_batch,
-                len(train_loader),
-                batch_time=batch_time,
-                loss=losses,
+        # Print status
+        if i_batch % print_freq == 0:
+            print(
+                "Epoch: [{0}][{1}/{2}]\t"
+                "Batch Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
+                "Loss {loss.val:.4f} ({loss.avg:.4f})\t".format(
+                    epoch,
+                    i_batch,
+                    len(train_loader),
+                    batch_time=batch_time,
+                    loss=losses,
+                )
             )
-        )
-    # free some memory since their histories may be stored
-    del predicted_class, predicted_coords, images, coords, all_crops
+        # free some memory since their histories may be stored
+        del predicted_class, predicted_coords, images, coords, all_crops
 
 
 def validate(val_loader, c_model, r_model, c_criterion, r_criterion):
@@ -552,7 +550,7 @@ def validate(val_loader, c_model, r_model, c_criterion, r_criterion):
 
     print("\n * LOSS - {loss.avg:.3f}\n".format(loss=losses))
 
-    return losses.avg
+    return losses.avg, losses2.avg
 
 
 # -- Load data -------------------------------------------------------
@@ -628,10 +626,10 @@ def main():
         )
 
         # One epoch's validation
-        val_loss = validate(val_loader=test_loader,
-                            c_model=classifModel, r_model=regrModel,
-                            c_criterion=classifCriterion,
-                            r_criterion=regrCriterion)
+        val_loss, regr_loss = validate(val_loader=test_loader,
+                                       c_model=classifModel, r_model=regrModel,
+                                       c_criterion=classifCriterion,
+                                       r_criterion=regrCriterion)
 
         # Did validation loss improve?
         is_best = val_loss < best_loss
@@ -646,7 +644,6 @@ def main():
             epochs_since_improvement = 0
 
         # Save checkpoint
-
         save_checkpoint(epoch, epochs_since_improvement, classifModel, regrModel, optimizer1,
                         optimizer2, val_loss, regr_loss, best_loss, is_best)
 
