@@ -1,5 +1,6 @@
 # Box prediction
-## Trying again! 
+# Trying again!
+import time
 from PIL import Image, ImageDraw
 import numpy as np
 
@@ -15,9 +16,8 @@ import os
 import seaborn as sns
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+import matplotlib.transforms as mplTransforms
 plt.style.use('ggplot')
-
-import time
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -25,17 +25,18 @@ print("CUDA available? device: ", device)
 
 # ---- Make depth images ------------------------------------
 # -----------------------------------------------------------
-IMG_X, IMG_Y = 200,200 
+IMG_X, IMG_Y = 200, 200
 # length and width of blocks (fixed for now)
 block_l, block_w = 20, 30
 
-batch_size = 15 
+batch_size = 15
 
 
 # -- Calc rectangle vertices. credit Sparkler, stackoverflow, feb 17
 def makeRectangle(l, w, theta, offset=(0, 0)):
     c, s = math.cos(theta), math.sin(theta)
-    rectCoords = [(l/2.0, w/2.0), (l/2.0, -w/2.0), (-l/2.0, -w/2.0), (-l/2.0, w/2.0)]
+    rectCoords = [(l/2.0, w/2.0), (l/2.0, -w/2.0),
+                  (-l/2.0, -w/2.0), (-l/2.0, w/2.0)]
     return [(c*x-s*y+offset[0], s*x+c*y+offset[1]) for (x, y) in rectCoords]
 
 
@@ -80,13 +81,14 @@ class RectDepthImgsDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        #print('true coord len', len(self.true_coords))
+        # print('true coord len', len(self.true_coords))
         return len(self.true_coords)
 
     def __getitem__(self, idx):
         # image = self.images[idx]
         image = io.imread(self.img_dir + '/rect'+str(idx)+'.png')
-        image = torch.FloatTensor(image).permute(2, 0, 1) #PIL and torch expect difft orders
+        image = torch.FloatTensor(image).permute(
+            2, 0, 1)  # PIL and torch expect difft orders
         coords = torch.FloatTensor(self.true_coords[idx])
 
         if self.transform:
@@ -100,7 +102,7 @@ class RectDepthImgsDataset(Dataset):
 
 
 # ---- Define Net ------------------------------------
-# -----------------------------------------------------------
+# ----------------------------------------------------
 class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28pred_x)
     def __init__(self, IMG_X, IMG_Y):
         super(Net, self).__init__()
@@ -114,14 +116,14 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28pred_x)
         num_classes = 3
 
         def _calc(val):
-            layer_size = (val- (_stride-1)) / _pool
+            layer_size = (val - (_stride-1)) / _pool
             return layer_size
 
-        #print(self._imgx)
+        # print(self._imgx)
         self._const = _calc(_calc(self._imgx))
         self._const *= _calc(_calc(self._imgy))
         self._const *= _outputlayers
-        #print(self._const)
+        # print(self._const)
         self._const = int(self._const)
 
         self.conv1 = nn.Conv2d(3, 6, _stride).to(device)
@@ -132,7 +134,7 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28pred_x)
         self.fc3 = nn.Linear(84, num_classes).to(device)
 
     def forward(self, x):
-        #print(x.size())
+        # print(x.size())
         x = x.to(device)
         x = x.view(-1, 3, IMG_X, IMG_Y)
         x = self.pool(F.relu(self.conv1(x)))
@@ -143,9 +145,11 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28pred_x)
         x = self.fc3(x)
         return x
 
-# -- Utility fxn -------------------------------------------------------
+# -- Utility fxn -------------------------------------
 # Source: https://github.com/sgrvinod/a-PyTorch-Tutorial-to-Object-Detection/blob/master/train.py
-## -------------------------------------
+# ---------------------------------------------------
+
+
 class AverageMeter(object):
     """
     Keeps track of most recent, average, sum, and count of a metric.
@@ -200,12 +204,12 @@ def save_checkpoint(epoch, epochs_since_improvement, regrModel,
 # -- Main Functions --------------------------------------------------
 # --------------------------------------------------------------------
 
+
 def run_dataset_creation():
-    train_truth = make_dataset('data', 500)
+    train_truth = make_dataset('data', 5000)
     print(len(train_truth))
     test_truth = make_dataset('./data/test', 300)
-        # to things
-
+    # to things
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("CUDA available? device: ", device)
@@ -217,53 +221,49 @@ def run_dataset_creation():
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size,
                               shuffle=True)
 
-    test_dataset = RectDepthImgsDataset(img_dir='./data/test', coords=test_truth)
+    test_dataset = RectDepthImgsDataset(
+        img_dir='./data/test', coords=test_truth)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size,
-                              shuffle=True)
-        
+                             shuffle=True)
+
     np.save("train_truth.npy", train_truth)
     np.save("test_truth.npy", test_truth)
 
 
-
-
 def train_dataset():
 
-    num_classes = 3 # predicting x,y,orientation
+    num_classes = 3  # predicting x,y,orientation
     learning_rate = 0.001
     criterion = nn.MSELoss()
-    num_epochs = 50
-
+    num_epochs = 80
 
     print_freq = 25  # print training or validation status every __ batches
     epochs_since_improvement = 0
     best_loss = 5000.0  # assume a high loss at first
 
     train_truth = np.load("train_truth.npy")
-    test_truth = np.load("test_truth.npy")  # loading the training and testing data5
-
+    # loading the training and testing data5
+    test_truth = np.load("test_truth.npy")
 
     batch_time = AverageMeter()  # forward prop. + back prop. time
     data_time = AverageMeter()  # data loading time
     loss_avg = AverageMeter()  # loss
     loss_history = []
 
-
     # -- Instantiate CNN -------------------------
     regrModel = Net(IMG_X, IMG_Y)
     regrModel = regrModel.to(device)
     optimizer = torch.optim.Adam(regrModel.parameters(), lr=learning_rate)
 
-    regrModel.train() # enable dropout
+    regrModel.train()  # enable dropout
     print('Training model now...')
-
 
     # -- Load datasets -------------------------
     train_truth = np.load("train_truth.npy")
     train_dataset = RectDepthImgsDataset(img_dir='./data', coords=train_truth)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size,
                               shuffle=True)
-    
+
     # -- Begin training -------------------------
     start = time.time()
 
@@ -288,7 +288,7 @@ def train_dataset():
 
             loss_avg.update(regrLoss.item())
 
-            # Print status 
+            # Print status
             batch_time.update(time.time() - start)
             start = time.time()
 
@@ -334,16 +334,18 @@ def view_loss_results():
     loss_history = checkpoint['loss_history']
     regrModel = checkpoint['regrModel']
 
-    print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' % (start_epoch, best_loss))
+    print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' %
+          (start_epoch, best_loss))
     test_truth = np.load("test_truth.npy")
-    test_dataset = RectDepthImgsDataset(img_dir='./data/test', coords=test_truth)
+    test_dataset = RectDepthImgsDataset(
+        img_dir='./data/test', coords=test_truth)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size,
-                              shuffle=True)
+                             shuffle=True)
 
     criterion = nn.MSELoss()
 
     with torch.no_grad():
-        
+
         dataiter = iter(test_loader)
         images, labels = dataiter.next()
 
@@ -358,18 +360,17 @@ def view_loss_results():
         # Loss
         print("loss across batch size of ", labels.size()[0], 'is: \n', loss)
 
-        #print(labels)
+        # print(labels)
         print('\n!-- labels size', labels.size())
 
-
-        plt.plot(range(len(loss_history)), loss_history) # regr loss
+        plt.plot(range(len(loss_history)), loss_history)  # regr loss
         plt.show()
         # plt.xlim((4500, 5100))
         # plt.ylim((0,30))
         # plt.show()
 
         # sns.regplot(x=np.arange(len(loss_history)),
-                    # y=np.array(loss_history)) # regr loss
+        # y=np.array(loss_history)) # regr loss
 
 
 def view_image_results():
@@ -380,17 +381,19 @@ def view_image_results():
     loss_history = checkpoint['loss_history']
     regrModel = checkpoint['regrModel']
 
-    print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' % (start_epoch, best_loss))
+    print('\nLoaded checkpoint from epoch %d. Best loss so far is %.3f.\n' %
+          (start_epoch, best_loss))
 
     test_truth = np.load("test_truth.npy")
-    test_dataset = RectDepthImgsDataset(img_dir='./data/test', coords=test_truth)
+    test_dataset = RectDepthImgsDataset(
+        img_dir='./data/test', coords=test_truth)
     test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size,
-                              shuffle=True)
+                             shuffle=True)
 
     criterion = nn.MSELoss()
 
     with torch.no_grad():
-        
+
         dataiter = iter(test_loader)
         images, coords = dataiter.next()
 
@@ -403,34 +406,46 @@ def view_image_results():
 
         labels = coords.cpu()
 
-        plt.rcParams['figure.figsize'] = [50,10]
+        plt.rcParams['figure.figsize'] = [50, 10]
 
-        fig,ax = plt.subplots()
+        fig, ax = plt.subplots()
 
         print('lenlabels', len(labels))
 
         for i in range(len(labels)-10):
             print('i', i)
             x, y, orient = labels[i].numpy()
-            pred_x, pred_y, orientation_pred = outputs[i].cpu().numpy()
-            
-            orient = np.rad2deg(orient)
-            orientation_pred = np.rad2deg(orientation_pred)
-            
-            truth_rect = patches.Rectangle((x + i * IMG_X, y), 30, 20, angle = orient,
-                                     fill=True, color='black')
-            pred_rect = patches.Rectangle((pred_x + i * IMG_X, pred_y), 30,20, angle =
-                                      orientation_pred, fill=True, color='orange')
-            image_outline = patches.Rectangle((i * IMG_X, 0), 200, 200, angle=0,
-                                              fill=False, color='black')
+            pred_x, pred_y, pred_orient = outputs[i].cpu().numpy()
+
+            orient = np.deg2rad(orient)
+            pred_orient = np.deg2rad(pred_orient)
+
+            # lower left
+            cornerX, cornerY = x - (block_l/2.), y - ((block_w/2.))
+            print('x,y', x, y, 'corners', cornerX, cornerY, 'orient', orient)
+            predCornerX, predCornerY = pred_x - \
+                (block_l/2.), pred_y - ((block_w/2.))
+
+            truth_rect = patches.Rectangle((cornerX + i * IMG_X, cornerY), block_l, block_w,
+                                           angle=0, fill=True, color='black')
+            # correct for rotation around LL corner
+            rotat = mplTransforms.Affine2D().rotate_around(x, y, orient)
+            truth_rect.set_transform(rotat + ax.transData)
+            print(truth_rect.get_xy())
 
             ax.add_patch(truth_rect)
-            ax.add_patch(pred_rect)
-            ax.add_patch(image_outline)
-            
+            # pred_rect = patches.Rectangle((predCornerX + i * IMG_X, predCornerY), block_l,
+            # block_w, angle = 0, fill=True, color='orange')
+            # image_outline = patches.Rectangle((i * IMG_X, 0), 200, 200, angle=0,
+            # fill=False, color='black')
+
+            # ax.add_patch(pred_rect)
+            # ax.add_patch(image_outline)
+
             # Scatter plot of true centers
-            ax.scatter(x + i*IMG_X, y, color='r', marker='x', linewidth='1')
-        #plt.imshow(np.transpose(a, (2,0,1)))
+            ax.scatter(x + i*IMG_X, y, color='r', marker='x', linewidth='1',
+                       zorder=100)
+        # plt.imshow(np.transpose(a, (2,0,1)))
         ax.set_aspect('equal', 'box')
         plt.show()
 
@@ -440,16 +455,17 @@ def main():
     # run_dataset_creation()
 
     print('Training model')
-    train_dataset()
+    # train_dataset()
 
     print('View results')
 
-    #view_loss_results()
+    # view_loss_results()
 
     view_image_results()
 
-#    input('Close all?')
-#    plt.close('all')
+    input('Close all?')
+    plt.close('all')
 
-if __name__ == '__main__' :
+
+if __name__ == '__main__':
     main()
