@@ -431,7 +431,7 @@ def view_image_results():
             truth_rect = patches.Rectangle((cornerX + i * IMG_X, cornerY), block_l, block_w,
                                            angle=0, fill=True, color='black')
             # correct for rotation around LL corner
-            rotat = mplTransforms.Affine2D().rotate_around(x, y, orient)
+            rotat = mplTransforms.Affine2D().rotate_around(x + IMG_X, y, orient)
             truth_rect.set_transform(rotat + ax.transData)
             print(truth_rect.get_xy())
 
