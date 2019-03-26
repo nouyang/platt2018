@@ -35,9 +35,9 @@ batch_size = 15
 # -- Calc rectangle vertices. credit Sparkler, stackoverflow, feb 17
 def makeRectangle(l, w, theta, offset=(0, 0)):
     c, s = math.cos(theta), math.sin(theta)
-    rectCoords = [(l/2.0, w/2.0), (l/2.0, -w/2.0),
-                  (-l/2.0, -w/2.0), (-l/2.0, w/2.0)]
-    return [(c*x-s*y+offset[0], s*x+c*y+offset[1]) for (x, y) in rectCoords]
+    rectCoords = [(l / 2.0, w / 2.0), (l / 2.0, -w / 2.0),
+                  (-l / 2.0, -w / 2.0), (-l / 2.0, w / 2.0)]
+    return [(c * x - s * y + offset[0], s * x + c * y + offset[1]) for (x, y) in rectCoords]
 
 
 # ---- Save to file -------------------
@@ -60,7 +60,7 @@ def make_dataset(dirname, num_images):
         rect_vertices = makeRectangle(
             block_l, block_w, orient, offset=(rand_x, rand_y))
 
-       # true_coords.append(np.array((rand_x, rand_y, math.degrees(orient))))
+        # true_coords.append(np.array((rand_x, rand_y, math.degrees(orient))))
         true_coords.append(np.array((rand_y, rand_x, math.degrees(orient))))
 
         idraw = ImageDraw.Draw(img)
@@ -86,7 +86,7 @@ class RectDepthImgsDataset(Dataset):
 
     def __getitem__(self, idx):
         # image = self.images[idx]
-        image = io.imread(self.img_dir + '/rect'+str(idx)+'.png')
+        image = io.imread(self.img_dir + '/rect' + str(idx) + '.png')
         image = torch.FloatTensor(image).permute(
             2, 0, 1)  # PIL and torch expect difft orders
         coords = torch.FloatTensor(self.true_coords[idx])
@@ -116,7 +116,7 @@ class Net(nn.Module):  # CIFAR is 32x32x3, MNIST is 28x28pred_x)
         num_classes = 3
 
         def _calc(val):
-            layer_size = (val - (_stride-1)) / _pool
+            layer_size = (val - (_stride - 1)) / _pool
             return layer_size
 
         # print(self._imgx)
@@ -411,8 +411,9 @@ def view_image_results():
         fig, ax = plt.subplots()
 
         print('lenlabels', len(labels))
+        print(block_l, block_w, IMG_X, IMG_Y)
 
-        for i in range(len(labels)-10):
+        for i in range(len(labels) - 10):
             print('i', i)
             x, y, orient = labels[i].numpy()
             pred_x, pred_y, pred_orient = outputs[i].cpu().numpy()
@@ -421,11 +422,12 @@ def view_image_results():
             pred_orient = np.deg2rad(pred_orient)
 
             # lower left
-            cornerX, cornerY = x - (block_l/2.), y - ((block_w/2.))
+            cornerX, cornerY = x - (block_l / 2.), y - ((block_w / 2.))
             print('x,y', x, y, 'corners', cornerX, cornerY, 'orient', orient)
             predCornerX, predCornerY = pred_x - \
-                (block_l/2.), pred_y - ((block_w/2.))
+                (block_l / 2.), pred_y - ((block_w / 2.))
 
+            print(cornerX, cornerY, x, y, orient)
             truth_rect = patches.Rectangle((cornerX + i * IMG_X, cornerY), block_l, block_w,
                                            angle=0, fill=True, color='black')
             # correct for rotation around LL corner
@@ -443,7 +445,7 @@ def view_image_results():
             # ax.add_patch(image_outline)
 
             # Scatter plot of true centers
-            ax.scatter(x + i*IMG_X, y, color='r', marker='x', linewidth='1',
+            ax.scatter(x + i * IMG_X, y, color='r', marker='x', linewidth='1',
                        zorder=100)
         # plt.imshow(np.transpose(a, (2,0,1)))
         ax.set_aspect('equal', 'box')
