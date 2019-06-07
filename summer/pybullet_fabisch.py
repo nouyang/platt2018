@@ -1,3 +1,5 @@
+# guide at http://alexanderfabisch.github.io/pybullet.html
+
 import pybullet as p
 import pybullet_data
 
@@ -70,3 +72,5 @@ p.setJointMotorControlArray(
 
 for _ in range(10000):
     p.stepSimulation()
+
+p.disconnect()
